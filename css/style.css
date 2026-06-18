@@ -948,6 +948,10 @@ main {
 .card-image img[alt*="Jackpot"],
 .card-image img[alt*="Spin"] {
   object-fit: contain;
+  width: auto;
+  height: auto;
+  max-width: calc(100% - 3rem);
+  max-height: 70%;
   padding: 1.5rem;
   background: var(--surface-elevated);
 }
