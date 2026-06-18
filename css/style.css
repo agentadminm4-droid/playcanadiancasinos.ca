@@ -920,3 +920,34 @@ main {
   .site-header, .site-footer, .hero-cta, .nav-cta { display: none; }
   body { background: white; color: black; }
 }
+
+/* Article hero image (added by generate_images.py) */
+.article-hero {
+  margin: 0 0 2rem;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+}
+
+.article-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Logo sizing in casino cards */
+.card-image img[alt*="Casino"],
+.card-image img[alt*="Jackpot"],
+.card-image img[alt*="Spin"] {
+  object-fit: contain;
+  padding: 1.5rem;
+  background: var(--surface-elevated);
+}
