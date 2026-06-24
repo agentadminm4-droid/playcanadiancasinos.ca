@@ -717,8 +717,8 @@ main {
   margin: 2rem 0;
 }
 .slot-card {
-  background: var(--surface-card, var(--bg-card, #fff));
-  border: 1px solid var(--border-light);
+  background: var(--surface-elevated, #1d2433);
+  border: 1px solid var(--border-light, #1f2532);
   border-radius: var(--radius-md, 10px);
   overflow: hidden;
   transition: transform var(--t-norm, 0.25s ease), border-color var(--t-norm, 0.25s ease), box-shadow var(--t-norm, 0.25s ease);
@@ -768,7 +768,7 @@ main {
   font-size: 1.125rem;
   font-weight: 700;
   margin: 0 0 0.625rem;
-  color: var(--text-primary, #fff);
+  color: var(--text, #e8eaed);
 }
 .slot-card-meta {
   display: flex;
@@ -778,7 +778,7 @@ main {
   font-size: 0.8125rem;
 }
 .slot-card-meta .provider {
-  color: var(--text-secondary, #b0b8c4);
+  color: var(--text-muted, #8b95a7);
   font-weight: 500;
 }
 .slot-card-meta .volatility {
@@ -792,11 +792,11 @@ main {
 .vol-high { color: #f87171; }
 .slot-card-stats {
   font-size: 0.875rem;
-  color: var(--text-secondary, #b0b8c4);
+  color: var(--text-muted, #8b95a7);
   margin-bottom: 1rem;
 }
 .slot-card-stats strong {
-  color: var(--text-primary, #fff);
+  color: var(--text, #e8eaed);
 }
 .slot-card .play-btn {
   display: inline-block;
