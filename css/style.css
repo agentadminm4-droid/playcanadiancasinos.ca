@@ -336,7 +336,7 @@ main {
 }
 
 .card:hover .card-image img {
-  transform: scale(1.05);
+  transform: none;
 }
 
 .card-image .card-badge {
