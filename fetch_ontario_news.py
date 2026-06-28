@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Fetch real Ontario iGaming news and inject into the homepage's
-'Latest Ontario Casino News' section.
+'Latest Ontario Casino News' section AND the blog index's 'Latest News' section.
 
 Sources (all public RSS / HTML):
   1. iGaming Ontario official news (igamingontario.ca/en/news)
@@ -15,13 +15,14 @@ Compliance:
     internal page. Affiliate disclosure + responsible gambling footer unchanged.
 
 Usage:
-  python3 fetch_ontario_news.py                 # update source index.html
-  python3 fetch_ontario_news.py --deploy        # also update deploy copy
-  python3 fetch_ontario_news.py --preview       # print cards, don't write
+  python3 fetch_ontario_news.py                          # update source index.html (homepage, 3 cards)
+  python3 fetch_ontario_news.py --deploy                 # also patch deploy copy
+  python3 fetch_ontario_news.py --blog --n 5             # also patch blog/index.html (5 cards)
+  python3 fetch_ontario_news.py --preview                # print cards, don't write
 
 Exit codes:
-  0 = updated OK (>= 3 cards written)
-  1 = no qualifying news found (homepage untouched)
+  0 = updated OK
+  1 = no qualifying news found (target untouched)
   2 = error fetching any source
 """
 import argparse
@@ -403,43 +404,71 @@ def render_news_block(articles: list) -> str:
     return "\n".join(render_card(a) for a in articles)
 
 
-# ---------- Inject into homepage ----------
-# Match: <h2>News</h2><a>All news →</a>  +  existing grid div  +  closing
-# </div></div></section>  (section-header close + container close + section close)
-SECTION_PATTERN = re.compile(
-    r'(<h2>Latest Ontario Casino News</h2>\s*'
-    r'<a href="/blog/" class="section-link">All news →</a>\s*'
-    r'</div>\s*\n\s*\n?\s*<div class="grid grid-3">)'   # section-header close + (blank line?) + grid open
-    r'(.*?)'                                            # cards inside grid (capture 2 — discarded)
-    r'(\s*</div>\s*</div>\s*</section>)',               # grid close + container close + section close
-    re.DOTALL,
-)
+# ---------- Inject into target pages ----------
+# Each "section spec" describes where to inject news cards in a given page.
+# - pattern: regex matching the section opener + grid opening + cards + grid close
+# - n: default card count for this section
+# - opener_indent: indent string placed before each rendered card (so cards align
+#   with the original markup)
+SECTION_SPECS = {
+    "homepage": {
+        "pattern": re.compile(
+            r'(<h2>Latest Ontario Casino News</h2>\s*'
+            r'<a href="/blog/" class="section-link">All news →</a>\s*'
+            r'</div>\s*\n\s*\n?\s*<div class="grid grid-3">)'   # section-header close + (blank line?) + grid open
+            r'(.*?)'                                            # cards (discarded)
+            r'(\s*</div>\s*</div>\s*</section>)',               # grid close + container close + section close
+            re.DOTALL,
+        ),
+        "default_n": 3,
+        # The "Latest News" page is the dedicated news destination, so always
+        # include the homepage's "All news →" link target.
+    },
+    "blog": {
+        # Blog index has a simpler structure: <h2>Latest News</h2> + grid (no section-header div)
+        "pattern": re.compile(
+            r'(<h2>Latest News</h2>\s*'
+            r'<div class="grid grid-3">)'                       # heading + grid open
+            r'(.*?)'                                            # cards (discarded)
+            r'(\s*</div>\s*</div>\s*</section>)',               # grid close + container close + section close
+            re.DOTALL,
+        ),
+        "default_n": 5,
+    },
+}
 
 
-def patch_index(index_path: Path, articles: list) -> bool:
-    """Replace the news grid contents inside the 'Latest Ontario Casino News' section."""
-    if not index_path.exists():
-        print(f"  SKIP: {index_path} not found", file=sys.stderr)
+def patch_section(target_path: Path, spec_key: str, articles: list) -> bool:
+    """Replace the news grid contents inside the named section of target_path.
+
+    spec_key: 'homepage' or 'blog' — picks which SECTION_SPECS entry to use.
+    """
+    spec = SECTION_SPECS[spec_key]
+    if not target_path.exists():
+        print(f"  SKIP: {target_path} not found", file=sys.stderr)
         return False
-    html_text = index_path.read_text(encoding="utf-8")
+    html_text = target_path.read_text(encoding="utf-8")
     new_block = render_news_block(articles)
     if not new_block:
         return False
 
-    # Replace ONLY the cards inside the grid, preserving the opening
-    # div and the closing </div></div></section> structure.
     def repl(m: re.Match) -> str:
         opening = m.group(1)
         closing = m.group(3)
         return opening + "\n" + new_block + "\n    " + closing.lstrip()
 
-    new_html, n = SECTION_PATTERN.subn(repl, html_text, count=1)
+    new_html, n = spec["pattern"].subn(repl, html_text, count=1)
     if n == 0:
-        print(f"  WARN: news section marker not found in {index_path.name}", file=sys.stderr)
+        print(f"  WARN: {spec_key} section marker not found in {target_path.name}", file=sys.stderr)
         return False
-    index_path.write_text(new_html, encoding="utf-8")
-    print(f"  OK: patched {index_path.name} with {len(articles)} cards")
+    target_path.write_text(new_html, encoding="utf-8")
+    print(f"  OK: patched {target_path.relative_to(Path.home())} [{spec_key}, {len(articles)} cards]")
     return True
+
+
+# Backwards-compat alias (kept so any external callers still work)
+def patch_index(index_path: Path, articles: list) -> bool:
+    return patch_section(index_path, "homepage", articles)
 
 
 # ---------- Main ----------
@@ -447,7 +476,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--deploy", action="store_true", help="Also patch deploy copy")
     parser.add_argument("--preview", action="store_true", help="Print cards, don't write")
-    parser.add_argument("--n", type=int, default=3, help="Number of cards (default 3)")
+    parser.add_argument("--blog", action="store_true", help="Also patch blog/index.html (5 cards by default)")
+    parser.add_argument("--n", type=int, default=None, help="Override card count (default: 3 homepage, 5 blog)")
+    parser.add_argument("--blog-n", type=int, default=5, help="Card count for blog/index.html when --blog is used")
     args = parser.parse_args()
 
     print("Fetching real Ontario iGaming news...")
@@ -461,24 +492,46 @@ def main():
         print("ERROR: no articles from any source", file=sys.stderr)
         sys.exit(2)
 
-    picked = dedupe_and_pick(all_articles, n=args.n)
-    print(f"\nSelected {len(picked)} cards:")
-    for a in picked:
+    # Homepage cards (3)
+    homepage_n = args.n if args.n is not None else SECTION_SPECS["homepage"]["default_n"]
+    homepage_articles = dedupe_and_pick(all_articles, n=homepage_n)
+
+    # Blog cards (5 — need a wider net, so re-pick from the same pool with a different n)
+    blog_articles = []
+    if args.blog:
+        blog_n = args.n if args.n is not None else args.blog_n
+        blog_articles = dedupe_and_pick(all_articles, n=blog_n)
+
+    print(f"\nSelected {len(homepage_articles)} homepage cards:")
+    for a in homepage_articles:
         print(f"  - [{a['publisher']}] {a['title'][:75]}...")
         print(f"    {a['url']}")
+    if args.blog:
+        print(f"\nSelected {len(blog_articles)} blog cards:")
+        for a in blog_articles:
+            print(f"  - [{a['publisher']}] {a['title'][:75]}...")
 
     if args.preview:
-        print("\n--- PREVIEW HTML ---")
-        print(render_news_block(picked))
+        print("\n--- PREVIEW HOMEPAGE ---")
+        print(render_news_block(homepage_articles))
+        if args.blog:
+            print("\n--- PREVIEW BLOG ---")
+            print(render_news_block(blog_articles))
         return
 
-    ok_source = patch_index(SOURCE_DIR / "index.html", picked)
+    # Patch homepage
+    ok_source_hp = patch_section(SOURCE_DIR / "index.html", "homepage", homepage_articles)
     if args.deploy:
-        ok_deploy = patch_index(DEPLOY_DIR / "index.html", picked)
-    else:
-        ok_deploy = True
+        patch_section(DEPLOY_DIR / "index.html", "homepage", homepage_articles)
 
-    if not ok_source:
+    # Patch blog index if requested
+    ok_source_blog = True
+    if args.blog:
+        ok_source_blog = patch_section(SOURCE_DIR / "blog" / "index.html", "blog", blog_articles)
+        if args.deploy:
+            patch_section(DEPLOY_DIR / "blog" / "index.html", "blog", blog_articles)
+
+    if not ok_source_hp or not ok_source_blog:
         sys.exit(1)
     print("\nDone.")
 
