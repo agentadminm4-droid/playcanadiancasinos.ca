@@ -406,6 +406,29 @@ main {
   letter-spacing: 0.05em;
 }
 
+.card-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  padding: 0.625rem 1.125rem;
+  background: var(--gold);
+  color: var(--bg);
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: all var(--transition);
+  width: 100%;
+}
+
+.card-cta:hover {
+  background: var(--gold-soft);
+  color: var(--bg);
+  transform: translateY(-1px);
+}
+
 /* Stats panel */
 .stats-panel {
   background: var(--surface);
